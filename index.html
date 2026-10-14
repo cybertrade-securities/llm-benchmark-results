@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM 工程任务评测</title>
+<meta name="description" content="三个大模型在 13 道真实工程任务上的评测结果：得分、分类、逐题表现与成本。">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f5f2; --surface: #fcfcfb; --surface-2: #f0efec; --line: #e2e1dc;
+  --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #7c7b76;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --h0: #f0efec; --h1: #cde2fb; --h2: #9ec5f4; --h3: #5598e7; --h4: #1c5cab;
+  --h-ink-dark: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --line: #33332f;
+    --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #93928a;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --h0: #2a2a27; --h1: #1f2f45; --h2: #184f95; --h3: #256abf; --h4: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --line: #33332f;
+  --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #93928a;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --h0: #2a2a27; --h1: #1f2f45; --h2: #184f95; --h3: #256abf; --h4: #3987e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 48px 16px 64px; }
+header h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.01em; }
+header p { color: var(--ink-2); margin: 0; max-width: 720px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.meta span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; color: var(--ink-2); }
+section { margin-top: 48px; }
+h2 { font-size: 20px; margin: 0 0 4px; }
+.lead { color: var(--ink-2); margin: 0 0 18px; font-size: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.card-head { display: flex; align-items: center; gap: 10px; }
+.card h3 { margin: 0; font-size: 18px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.s1 .dot, .s1 .bar, .s1 .meter span { background: var(--s1); }
+.s2 .dot, .s2 .bar, .s2 .meter span { background: var(--s2); }
+.s3 .dot, .s3 .bar, .s3 .meter span { background: var(--s3); }
+.badge { margin-left: auto; font-size: 12px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.model-id { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink-3); margin: 6px 0 14px; word-break: break-all; }
+.setup { margin: -6px 0 14px; font-size: 13px; color: var(--ink-2); } .setup span { color: var(--ink-3); }
+.score { margin: 0; display: flex; align-items: baseline; gap: 6px; }
+.big { font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.of { color: var(--ink-2); }
+.meter { height: 6px; background: var(--surface-2); border-radius: 999px; margin: 14px 0 16px; overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 999px; }
+dl { margin: 0; display: grid; gap: 6px; }
+dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+dt { color: var(--ink-3); } dd { margin: 0; text-align: right; color: var(--ink-2); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+.cat h4 { margin: 0 0 10px; font-size: 15px; display: flex; justify-content: space-between; }
+.cat h4 span { font-weight: 400; color: var(--ink-3); font-size: 13px; }
+.cat + .cat { margin-top: 20px; }
+.bar-row { display: grid; grid-template-columns: 88px 1fr 72px; align-items: center; gap: 10px; margin: 8px 0; font-size: 13px; }
+.bar-label { color: var(--ink-2); }
+.bar-track { height: 14px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.bar { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.bar-value { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+thead th { font-size: 13px; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+thead th .dot { margin-right: 6px; }
+tbody th { font-weight: 500; }
+.tid { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink-3); margin-right: 8px; }
+.cat-tag { margin-left: 8px; font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+.heat td { text-align: center; font-variant-numeric: tabular-nums; width: 15%; position: relative; border-left: 2px solid var(--surface); }
+.heat td span { font-weight: 600; } .heat td small { color: inherit; opacity: .75; }
+.heat td i { position: absolute; top: 2px; right: 6px; font-style: normal; font-size: 12px; }
+.h0 { background: var(--h0); } .h1 { background: var(--h1); } .h2 { background: var(--h2); }
+.h3 { background: var(--h3); color: #fff; } .h4 { background: var(--h4); color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .heat tbody td { color: #fff; } }
+:root[data-theme="dark"] .heat tbody td { color: #fff; }
+.heat tfoot td { background: var(--surface-2); color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 12px; color: var(--ink-3); margin-top: 10px; }
+.legend .sw { display: inline-block; width: 18px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+.notes td:nth-child(3) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+ul.method { margin: 0; padding-left: 20px; color: var(--ink-2); }
+ul.method li + li { margin-top: 6px; }
+footer { margin-top: 56px; color: var(--ink-3); font-size: 13px; }
+@media (max-width: 560px) {
+  .bar-row { grid-template-columns: 72px 1fr 60px; } .big { font-size: 44px; }
+  th, td { padding: 8px 6px; font-size: 13px; } .cat-tag, .tid { display: none; }
+  .heat td { width: auto; } .heat thead th .dot { display: none; }
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>LLM 工程任务评测</h1>
+  <p>三个大模型在同一套私有交易系统代码库上完成 13 道真实工程任务：读代码、修缺陷、用链上数据工具分析交易。每题按固定评分要点人工审核答案、工具记录、代码改动与独立测试。</p>
+  <div class="meta"><span>2026-10-14</span><span>13 道计分任务 · 满分 100</span><span>每个模型 1 次运行</span><span>同一 agent 框架与隔离容器</span></div>
+</header>
+
+<section>
+  <h2>总分</h2>
+  <p class="lead">三者差距很小，单次运行不足以区分高下；差异主要体现在具体题目与成本上。</p>
+  <div class="cards">
+    <article class="card s1">
+      <div class="card-head"><span class="dot"></span><h3>GPT 6 Luna</h3><span class="badge">最高分</span></div>
+      <p class="model-id">gpt-6-luna</p>
+      <p class="setup">API · reasoning high<br><span>通过 ChatGPT / Codex 登录调用</span></p>
+      <p class="score"><span class="big">95</span><span class="of">/ 100</span></p>
+      <div class="meter" role="img" aria-label="95 / 100"><span style="width:95%"></span></div>
+      <dl>
+        <div><dt>输出 tokens</dt><dd>96k</dd></div>
+        <div><dt>候选总耗时</dt><dd>25 分钟</dd></div>
+      </dl>
+    </article>
+    <article class="card s2">
+      <div class="card-head"><span class="dot"></span><h3>Strata</h3></div>
+      <p class="model-id">qwen3.8-flash-next-iq3_s</p>
+      <p class="setup">本地部署 · IQ3_S 量化<br><span>约 120 tokens/s</span></p>
+      <p class="score"><span class="big">94</span><span class="of">/ 100</span></p>
+      <div class="meter" role="img" aria-label="94 / 100"><span style="width:94%"></span></div>
+      <dl>
+        <div><dt>输出 tokens</dt><dd>589k</dd></div>
+        <div><dt>候选总耗时</dt><dd>83 分钟</dd></div>
+      </dl>
+    </article>
+    <article class="card s3">
+      <div class="card-head"><span class="dot"></span><h3>Maya</h3></div>
+      <p class="model-id">glm-5.3-flash</p>
+      <p class="setup">本地部署 · Maya-S IQ2_XXS<br><span>单张 RTX 5090 + 内存分层，256K 上下文，约 20 tokens/s</span></p>
+      <p class="score"><span class="big">94</span><span class="of">/ 100</span></p>
+      <div class="meter" role="img" aria-label="94 / 100"><span style="width:94%"></span></div>
+      <dl>
+        <div><dt>输出 tokens</dt><dd>222k</dd></div>
+        <div><dt>候选总耗时</dt><dd>162 分钟</dd></div>
+      </dl>
+    </article></div>
+</section>
+
+<section>
+  <h2>分类得分与成本</h2>
+  <p class="lead">分析：读懂调用链、资金流和边界条件；修复：在代码库里改对并验证；链上工具：用只读链上数据工具核对交易与合约。</p>
+  <div class="grid2">
+    <div class="panel"><div class="cat"><h4>分析<span>满分 48</span></h4><div class="bar-row s1" title="GPT 6 Luna · 分析：45 / 48">
+        <span class="bar-label">GPT 6 Luna</span>
+        <span class="bar-track"><span class="bar" style="width:93.8%"></span></span>
+        <span class="bar-value">45 / 48</span></div><div class="bar-row s2" title="Strata · 分析：45 / 48">
+        <span class="bar-label">Strata</span>
+        <span class="bar-track"><span class="bar" style="width:93.8%"></span></span>
+        <span class="bar-value">45 / 48</span></div><div class="bar-row s3" title="Maya · 分析：46 / 48">
+        <span class="bar-label">Maya</span>
+        <span class="bar-track"><span class="bar" style="width:95.8%"></span></span>
+        <span class="bar-value">46 / 48</span></div></div><div class="cat"><h4>修复<span>满分 32</span></h4><div class="bar-row s1" title="GPT 6 Luna · 修复：31 / 32">
+        <span class="bar-label">GPT 6 Luna</span>
+        <span class="bar-track"><span class="bar" style="width:96.9%"></span></span>
+        <span class="bar-value">31 / 32</span></div><div class="bar-row s2" title="Strata · 修复：32 / 32">
+        <span class="bar-label">Strata</span>
+        <span class="bar-track"><span class="bar" style="width:100.0%"></span></span>
+        <span class="bar-value">32 / 32</span></div><div class="bar-row s3" title="Maya · 修复：31 / 32">
+        <span class="bar-label">Maya</span>
+        <span class="bar-track"><span class="bar" style="width:96.9%"></span></span>
+        <span class="bar-value">31 / 32</span></div></div><div class="cat"><h4>链上工具<span>满分 20</span></h4><div class="bar-row s1" title="GPT 6 Luna · 链上工具：19 / 20">
+        <span class="bar-label">GPT 6 Luna</span>
+        <span class="bar-track"><span class="bar" style="width:95.0%"></span></span>
+        <span class="bar-value">19 / 20</span></div><div class="bar-row s2" title="Strata · 链上工具：17 / 20">
+        <span class="bar-label">Strata</span>
+        <span class="bar-track"><span class="bar" style="width:85.0%"></span></span>
+        <span class="bar-value">17 / 20</span></div><div class="bar-row s3" title="Maya · 链上工具：17 / 20">
+        <span class="bar-label">Maya</span>
+        <span class="bar-track"><span class="bar" style="width:85.0%"></span></span>
+        <span class="bar-value">17 / 20</span></div></div></div>
+    <div class="panel"><div class="cat"><h4>13 题输出 tokens</h4><div class="bar-row s1" title="GPT 6 Luna：96k">
+        <span class="bar-label">GPT 6 Luna</span>
+        <span class="bar-track"><span class="bar" style="width:16.3%"></span></span>
+        <span class="bar-value">96k</span></div><div class="bar-row s2" title="Strata：589k">
+        <span class="bar-label">Strata</span>
+        <span class="bar-track"><span class="bar" style="width:100.0%"></span></span>
+        <span class="bar-value">589k</span></div><div class="bar-row s3" title="Maya：222k">
+        <span class="bar-label">Maya</span>
+        <span class="bar-track"><span class="bar" style="width:37.8%"></span></span>
+        <span class="bar-value">222k</span></div></div><div class="cat"><h4>13 题候选总耗时</h4><div class="bar-row s1" title="GPT 6 Luna：25 分钟">
+        <span class="bar-label">GPT 6 Luna</span>
+        <span class="bar-track"><span class="bar" style="width:15.7%"></span></span>
+        <span class="bar-value">25 分钟</span></div><div class="bar-row s2" title="Strata：83 分钟">
+        <span class="bar-label">Strata</span>
+        <span class="bar-track"><span class="bar" style="width:51.2%"></span></span>
+        <span class="bar-value">83 分钟</span></div><div class="bar-row s3" title="Maya：162 分钟">
+        <span class="bar-label">Maya</span>
+        <span class="bar-track"><span class="bar" style="width:100.0%"></span></span>
+        <span class="bar-value">162 分钟</span></div></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>逐题得分</h2>
+  <p class="lead">得分率越高颜色越饱和；带 • 的格子有扣分，悬停可看原因，下方也有列表。</p>
+  <div class="table-wrap">
+    <table class="heat">
+      <thead><tr><th scope="col">任务</th><th scope="col" class="s1"><span class="dot"></span>GPT 6 Luna</th><th scope="col" class="s2"><span class="dot"></span>Strata</th><th scope="col" class="s3"><span class="dot"></span>Maya</th></tr></thead>
+      <tbody><tr><th scope="row"><span class="tid">T01</span>跨仓库调用链分析<span class="cat-tag">分析</span></th><td class="h3" title="GPT 6 Luna · T01：7 / 8 — 把共享引擎的职责归到了宿主节点"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td><td class="h4" title="Strata · T01：8 / 8"><span>8</span><small>/8</small></td><td class="h3" title="Maya · T01：6 / 8 — 职责归属有误，部分代码引用的行号不准"><span>6</span><small>/8</small><i aria-hidden="true">•</i></td></tr><tr><th scope="row"><span class="tid">T02</span>收益与风控判定分析<span class="cat-tag">分析</span></th><td class="h3" title="GPT 6 Luna · T02：7 / 8 — 风控成本口径的判断与实现不符"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td><td class="h4" title="Strata · T02：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Maya · T02：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T03</span>底层内存安全审计<span class="cat-tag">分析</span></th><td class="h4" title="GPT 6 Luna · T03：8 / 8"><span>8</span><small>/8</small></td><td class="h3" title="Strata · T03：6 / 8 — 额外引入两处错误前提（内存槽位与多余的边界检查）"><span>6</span><small>/8</small><i aria-hidden="true">•</i></td><td class="h4" title="Maya · T03：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T04</span>定价规则匹配修复<span class="cat-tag">修复</span></th><td class="h4" title="GPT 6 Luna · T04：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Strata · T04：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Maya · T04：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T05</span>批量打包参数传递修复<span class="cat-tag">修复</span></th><td class="h4" title="GPT 6 Luna · T05：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Strata · T05：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Maya · T05：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T06</span>资金流与舍入分析<span class="cat-tag">分析</span></th><td class="h4" title="GPT 6 Luna · T06：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Strata · T06：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Maya · T06：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T07</span>前端分组下拉修复<span class="cat-tag">修复</span></th><td class="h3" title="GPT 6 Luna · T07：7 / 8 — 缺少组件或浏览器层面的行为验证"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td><td class="h4" title="Strata · T07：8 / 8"><span>8</span><small>/8</small></td><td class="h3" title="Maya · T07：7 / 8 — 缺少组件或浏览器层面的行为验证"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td></tr><tr><th scope="row"><span class="tid">T08</span>数据索引去重修复<span class="cat-tag">修复</span></th><td class="h4" title="GPT 6 Luna · T08：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Strata · T08：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Maya · T08：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T09</span>跨链移植方案审查<span class="cat-tag">分析</span></th><td class="h4" title="GPT 6 Luna · T09：8 / 8"><span>8</span><small>/8</small></td><td class="h3" title="Strata · T09：7 / 8 — 对一个内部调用协议的归属判断有误"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td><td class="h4" title="Maya · T09：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T10</span>策略故障诊断与回放设计<span class="cat-tag">分析</span></th><td class="h3" title="GPT 6 Luna · T10：7 / 8 — 回放方案没有补全最终余额与事件断言"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td><td class="h4" title="Strata · T10：8 / 8"><span>8</span><small>/8</small></td><td class="h4" title="Maya · T10：8 / 8"><span>8</span><small>/8</small></td></tr><tr><th scope="row"><span class="tid">T11</span>链上交易机制与收益分析<span class="cat-tag">链上工具</span></th><td class="h4" title="GPT 6 Luna · T11：6 / 6"><span>6</span><small>/6</small></td><td class="h2" title="Strata · T11：4 / 6 — 库存推断缺乏证据，并误读了两个协议参数"><span>4</span><small>/6</small><i aria-hidden="true">•</i></td><td class="h3" title="Maya · T11：5 / 6 — ETH 与代币的单位换算错了 1000 倍"><span>5</span><small>/6</small><i aria-hidden="true">•</i></td></tr><tr><th scope="row"><span class="tid">T12</span>合约源码与限额核验<span class="cat-tag">链上工具</span></th><td class="h3" title="GPT 6 Luna · T12：5 / 6 — 未核验合约层的输出检查，且有一处调用点判断错误"><span>5</span><small>/6</small><i aria-hidden="true">•</i></td><td class="h4" title="Strata · T12：6 / 6"><span>6</span><small>/6</small></td><td class="h3" title="Maya · T12：5 / 6 — 未找到合约层真正的最小输出检查"><span>5</span><small>/6</small><i aria-hidden="true">•</i></td></tr><tr><th scope="row"><span class="tid">T13</span>Sandwich / JIT 识别与记账<span class="cat-tag">链上工具</span></th><td class="h4" title="GPT 6 Luna · T13：8 / 8"><span>8</span><small>/8</small></td><td class="h3" title="Strata · T13：7 / 8 — 关键中间交易缺少直接证据"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td><td class="h3" title="Maya · T13：7 / 8 — gas 与优先费的 ETH 换算有误，并混入了中间交易的成本"><span>7</span><small>/8</small><i aria-hidden="true">•</i></td></tr></tbody>
+      <tfoot><tr><th scope="row">合计</th><td><strong>95</strong><small>/100</small></td><td><strong>94</strong><small>/100</small></td><td><strong>94</strong><small>/100</small></td></tr></tfoot>
+    </table>
+  </div>
+  <div class="legend"><span>得分率</span><span><span class="sw" style="background:var(--h1)"></span>低</span><span><span class="sw" style="background:var(--h2)"></span></span><span><span class="sw" style="background:var(--h3)"></span></span><span><span class="sw" style="background:var(--h4)"></span>满分</span></div>
+</section>
+
+<section>
+  <h2>扣分说明</h2>
+  <p class="lead">只列被扣分的题目，用一句话概括原因。</p>
+  <div class="table-wrap"><table class="notes"><thead><tr><th>任务</th><th>模型</th><th>得分</th><th>原因</th></tr></thead><tbody><tr><td>T01 跨仓库调用链分析</td><td>GPT 6 Luna</td><td>7 / 8</td><td>把共享引擎的职责归到了宿主节点</td></tr><tr><td>T01 跨仓库调用链分析</td><td>Maya</td><td>6 / 8</td><td>职责归属有误，部分代码引用的行号不准</td></tr><tr><td>T02 收益与风控判定分析</td><td>GPT 6 Luna</td><td>7 / 8</td><td>风控成本口径的判断与实现不符</td></tr><tr><td>T03 底层内存安全审计</td><td>Strata</td><td>6 / 8</td><td>额外引入两处错误前提（内存槽位与多余的边界检查）</td></tr><tr><td>T07 前端分组下拉修复</td><td>GPT 6 Luna</td><td>7 / 8</td><td>缺少组件或浏览器层面的行为验证</td></tr><tr><td>T07 前端分组下拉修复</td><td>Maya</td><td>7 / 8</td><td>缺少组件或浏览器层面的行为验证</td></tr><tr><td>T09 跨链移植方案审查</td><td>Strata</td><td>7 / 8</td><td>对一个内部调用协议的归属判断有误</td></tr><tr><td>T10 策略故障诊断与回放设计</td><td>GPT 6 Luna</td><td>7 / 8</td><td>回放方案没有补全最终余额与事件断言</td></tr><tr><td>T11 链上交易机制与收益分析</td><td>Strata</td><td>4 / 6</td><td>库存推断缺乏证据，并误读了两个协议参数</td></tr><tr><td>T11 链上交易机制与收益分析</td><td>Maya</td><td>5 / 6</td><td>ETH 与代币的单位换算错了 1000 倍</td></tr><tr><td>T12 合约源码与限额核验</td><td>GPT 6 Luna</td><td>5 / 6</td><td>未核验合约层的输出检查，且有一处调用点判断错误</td></tr><tr><td>T12 合约源码与限额核验</td><td>Maya</td><td>5 / 6</td><td>未找到合约层真正的最小输出检查</td></tr><tr><td>T13 Sandwich / JIT 识别与记账</td><td>Strata</td><td>7 / 8</td><td>关键中间交易缺少直接证据</td></tr><tr><td>T13 Sandwich / JIT 识别与记账</td><td>Maya</td><td>7 / 8</td><td>gas 与优先费的 ETH 换算有误，并混入了中间交易的成本</td></tr></tbody></table></div>
+</section>
+
+<section>
+  <h2>评测方法与局限</h2>
+  <ul class="method">
+    <li>三个模型使用同一个 agent 框架（Codex CLI），每题都是新会话、新容器、新导出的代码副本，不共享其它题目的上下文。</li>
+    <li>容器无外网，只能通过网关访问只读的链上数据工具和固定区块的状态；不发送任何交易。</li>
+    <li>修复类题目在模型结束后由评估者重新运行测试；分析类题目对照固定评分要点逐项核对证据。</li>
+    <li>每个模型只跑了 1 次。早期试跑的几道题（GPT 6 Luna 3 道、Strata 2 道）使用 64K 输出预算，其余题目均不限输出 tokens；本地模型的时间上限更宽松。耗时受硬件与并发影响，仅供参考。</li>
+    <li>另有 2 道 DEX 接入实现题因评估环境无法完成真实 EVM 验证，三方均未计分。</li>
+    <li>Maya 的本地服务偶尔把工具调用以文本形式输出，评测前在适配层加了兜底转换，未改变模型的输出内容。</li>
+  </ul>
+</section>
+
+<footer>生成于 2026-10-14 · 结果仅反映这套工程任务，不代表通用模型排名。</footer>
+</main>
+</body>
+</html>
