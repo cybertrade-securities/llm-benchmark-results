@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blossom Pagoda · A Voxel Garden</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { font-family: 'DM Sans', 'VoxelUI', sans-serif; background: radial-gradient(circle at 70% 21%, #fff3d8 0, #f0dcc2 25%, #cbdfd7 62%, #9dbeb7 100%); color: #303c39; }
+    #scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; cursor: grab; }
+    #scene:active { cursor: grabbing; }
+    #lettering { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+    .vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 54% 48%, transparent 35%, rgba(45,66,61,.14) 100%); }
+    .brand, .badge, .footer, .credit { opacity: 0; }
+    .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .25em; text-transform: uppercase; }
+    .brand { position: fixed; top: 39px; left: 48px; pointer-events: none; text-shadow: 0 1px 15px #f9f1e7; }
+    .brand .eyebrow { color: #ad5e53; margin-bottom: 7px; }
+    h1 { font-family: 'Playfair Display', 'VoxelUI', Georgia, serif; font-weight: 600; font-size: clamp(31px, 3.8vw, 57px); letter-spacing: -.055em; line-height: 1; margin: 0; }
+    .subtitle { margin-top: 12px; font-size: 12px; letter-spacing: .035em; color: #5d6b66; }
+    .badge { position: fixed; top: 42px; right: 48px; display: flex; align-items: center; gap: 9px; pointer-events: none; color: #51645d; }
+    .badge i { width: 7px; height: 7px; border-radius: 50%; background: #d57579; box-shadow: 0 0 0 4px #d5757926; }
+    .footer { position: fixed; left: 48px; bottom: 35px; display: flex; align-items: center; gap: 12px; pointer-events: none; color: #52635b; font-size: 11px; letter-spacing: .05em; }
+    .footer .line { width: 30px; height: 1px; background: #9faaa0; }
+    .credit { position: fixed; right: 48px; bottom: 35px; pointer-events: none; font-size: 10px; color: #6c7b71; letter-spacing: .12em; text-transform: uppercase; }
+    @media(max-width: 700px) { .brand { top: 25px; left: 24px; } .badge { top: 29px; right: 22px; } .badge span { display: none; } .footer { left: 24px; bottom: 22px; } .credit { right: 24px; bottom: 22px; font-size: 9px; } .subtitle { max-width: 230px; line-height: 1.4; } }
+  </style>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+  </script>
+</head>
+<body>
+  <canvas id="scene" aria-label="Interactive three dimensional voxel garden with a pagoda, cherry trees, pond and bridge"></canvas>
+  <div class="vignette"></div>
+  <canvas id="lettering" aria-hidden="true"></canvas>
+  <header class="brand"><div class="eyebrow">An imagined place · spring collection</div><h1>Blossom Pagoda</h1><div class="subtitle">A quiet world built one little block at a time.</div></header>
+  <div class="badge"><i></i><span class="eyebrow">Interactive voxel garden</span></div>
+  <div class="footer"><span class="line"></span><span>Drag to wander · Scroll to explore</span></div>
+  <div class="credit">Made of little worlds</div>
+  <script>
+    // Tiny bitmap glyphs keep the labels crisp even on systems without fonts.
+    const glyphs = {
+      A:['01110','10001','10001','11111','10001','10001','10001'],
+      B:['11110','10001','10001','11110','10001','10001','11110'],
+      C:['01111','10000','10000','10000','10000','10000','01111'],
+      D:['11110','10001','10001','10001','10001','10001','11110'],
+      E:['11111','10000','10000','11110','10000','10000','11111'],
+      F:['11111','10000','10000','11110','10000','10000','10000'],
+      G:['01111','10000','10000','10111','10001','10001','01111'],
+      H:['10001','10001','10001','11111','10001','10001','10001'],
+      I:['11111','00100','00100','00100','00100','00100','11111'],
+      J:['00111','00010','00010','00010','10010','10010','01100'],
+      K:['10001','10010','10100','11000','10100','10010','10001'],
+      L:['10000','10000','10000','10000','10000','10000','11111'],
+      M:['10001','11011','10101','10101','10001','10001','10001'],
+      N:['10001','11001','10101','10011','10001','10001','10001'],
+      O:['01110','10001','10001','10001','10001','10001','01110'],
+      P:['11110','10001','10001','11110','10000','10000','10000'],
+      Q:['01110','10001','10001','10001','10101','10010','01101'],
+      R:['11110','10001','10001','11110','10100','10010','10001'],
+      S:['01111','10000','10000','01110','00001','00001','11110'],
+      T:['11111','00100','00100','00100','00100','00100','00100'],
+      U:['10001','10001','10001','10001','10001','10001','01110'],
+      V:['10001','10001','10001','10001','10001','01010','00100'],
+      W:['10001','10001','10001','10101','10101','10101','01010'],
+      X:['10001','10001','01010','00100','01010','10001','10001'],
+      Y:['10001','10001','01010','00100','00100','00100','00100'],
+      Z:['11111','00001','00010','00100','01000','10000','11111'],
+      '.':['00000','00000','00000','00000','00000','01100','01100'],
+      '/':['00001','00001','00010','00100','01000','10000','10000'],
+      ' ':['00000','00000','00000','00000','00000','00000','00000']
+    };
+    const letters=document.querySelector('#lettering'), lctx=letters.getContext('2d');
+    function label(str,x,y,size,color) {
+      lctx.fillStyle=color;
+      for(let i=0;i<str.length;i++) {
+        const glyph=glyphs[str[i]]||glyphs[' '];
+        for(let row=0;row<7;row++) for(let col=0;col<5;col++) if(glyph[row][col]==='1')
+          lctx.fillRect(Math.round(x+i*6*size+col*size),Math.round(y+row*size),Math.ceil(size*.83),Math.ceil(size*.83));
+      }
+    }
+    function labelWidth(str,size) {return str.length*6*size;}
+    function drawLabels() {
+      const dpr=Math.min(devicePixelRatio||1,2),w=innerWidth,h=innerHeight,mobile=w<700;
+      letters.width=Math.round(w*dpr);letters.height=Math.round(h*dpr);
+      lctx.setTransform(dpr,0,0,dpr,0,0);lctx.clearRect(0,0,w,h);
+      const x=mobile?24:48,y=mobile?27:40;
+      label('AN IMAGINED PLACE / SPRING COLLECTION',x,y,mobile?1.08:1.36,'#a4615b');
+      label('BLOSSOM PAGODA',x,y+(mobile?19:22),mobile?2.6:4.05,'#303f3a');
+      label('A QUIET WORLD BUILT ONE LITTLE BLOCK AT A TIME.',x,y+(mobile?48:63),mobile?1.07:1.32,'#5a6c64');
+      lctx.fillStyle='#d57579';lctx.beginPath();lctx.arc(w-(mobile?27:48),mobile?31:45,4,0,Math.PI*2);lctx.fill();
+      if(!mobile) { const s='INTERACTIVE VOXEL GARDEN';label(s,w-67-labelWidth(s,1.25),41,1.25,'#53675e'); }
+      lctx.fillStyle='#889c91';lctx.fillRect(x,h-(mobile?27:40),28,1);
+      label('DRAG TO WANDER / SCROLL TO EXPLORE',x+41,h-(mobile?30:44),mobile?1.07:1.22,'#566960');
+      if(!mobile) { const s='MADE OF LITTLE WORLDS'; label(s,w-48-labelWidth(s,1.16),h-44,1.16,'#65776d'); }
+    }
+    addEventListener('resize',drawLabels);drawLabels();
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('#scene'), antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.3));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const scene = new THREE.Scene();
+    scene.background = null;
+    scene.fog = new THREE.Fog('#d9e4d8', 75, 145);
+    const camera = new THREE.OrthographicCamera(-37, 37, 29, -29, 0.1, 250);
+    camera.position.set(54, 39, 57);
+    camera.lookAt(0, 8, 0);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 7, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = .055;
+    controls.minZoom = .62;
+    controls.maxZoom = 2.15;
+    controls.maxPolarAngle = Math.PI * .49;
+    controls.minPolarAngle = .30;
+    controls.enablePan = false;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = .18;
+
+    scene.add(new THREE.HemisphereLight('#fff3dc', '#7b8b80', 1.65));
+    const sun = new THREE.DirectionalLight('#fff3da', 2.65);
+    sun.position.set(-22, 55, 38);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -43; sun.shadow.camera.right = 43;
+    sun.shadow.camera.top = 43; sun.shadow.camera.bottom = -43;
+    sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
+    sun.shadow.bias = -.00035;
+    scene.add(sun);
+
+    // A single instanced cube collection keeps the many hand placed blocks responsive.
+    const cubes = [];
+    const box = (x,y,z,w,h,d,c) => cubes.push([x,y,z,w,h,d,c]);
+    let seed = 238491;
+    const rand = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
+    const pick = a => a[Math.floor(rand()*a.length)];
+    const between = (a,b) => a + (b-a)*rand();
+    const groundColors = ['#81a76b','#8faf70','#92ae73','#9ab677','#7fa566','#88aa6c'];
+    const stoneColors = ['#c8bfaa','#d8cab1','#b7baa9','#b5ad9d','#e2cfb1'];
+    const pinks = ['#f2a9ba','#f7c0cd','#e98ea9','#f6d0d1','#e77f9c','#ffd5d4','#e3a0b9'];
+    const darkPink = ['#cb6f8d','#d67d9b','#e490ac'];
+    const foliage = ['#759e70','#81a76f','#98b47b','#5e8d69','#acc384'];
+    const gold = '#dfb76c', red = '#a84e48', deepRed = '#783c3c', wood = '#67453f', cream = '#f2dfb5';
+    const roof = ['#365b69','#416b73','#537b81','#3f6473','#62858a'];
+    const P = {x:-5, z:-5};
+
+    // The garden is a small layered island with a rough stone perimeter.
+    for (let x=-26; x<=26; x++) for (let z=-25; z<=25; z++) {
+      const irregular = Math.sin(x*.71)*.6 + Math.cos(z*.55)*.65 + Math.sin((x+z)*.31)*.65;
+      if ((x/26)**2+(z/25)**2 > 1.08 + irregular*.045) continue;
+      const pond = ((x-10)/10.8)**2 + ((z-9)/7.1)**2 < 1;
+      box(x,-1.38,z,.98,2.25,.98,pick(['#817e70','#777c70','#979184','#aaa18b']));
+      box(x,-.23,z,1,.28,1,pond ? '#807e73' : pick(groundColors));
+      if (pond) {
+        const ripple = Math.sin(x*1.4+z*.45)*.5 + Math.cos(z*1.15)*.5;
+        box(x,.02,z,.96,.13,.96,pick(ripple>.55 ? ['#a5d6ce','#9dcbc9','#b2ded2'] : ['#80bdbb','#8ac6c2','#94cfc7']));
+        if (rand()<.1) box(x,.11,z,.38,.025,.05,'#d9ede1');
+      } else if (rand()<.08) box(x,.03,z,.23,.2,.23,pick(['#69995c','#6b9e62','#9fba75']));
+      if (!pond && ((x-10)/11.4)**2+((z-9)/7.7)**2<1.08 && ((x-10)/10.3)**2+((z-9)/6.6)**2>1) {
+        box(x,.16,z,.95,.42,.95,pick(stoneColors));
+      }
+    }
+    // An irregular dark plinth casts a crisp architectural shadow.
+    box(0,-2.68,0,48,1.45,45,'#686e63');
+    box(0,-3.48,0,43,.24,40,'#596961');
+
+    // Stone walk: a winding sequence of individually colored square slabs.
+    const pathPoints=[];
+    for(let i=0;i<26;i++) {
+      const t=i/25, z=23-t*26, x=-5 + 2.7*Math.sin(t*Math.PI*1.25);
+      pathPoints.push([x,z]);
+      for(let j=-1;j<=1;j++) box(x+j*.85,.13,z, .77,.24,.77,pick(stoneColors));
+    }
+    for(let i=0;i<8;i++) box(-5, .24+i*.16, 3.2-i*.46, 8.6,.3,.54,pick(stoneColors));
+
+    // Pagoda: cream plaster, timber grid, tiled roofs and a tiered golden finial.
+    box(P.x,.68,P.z,15.5,1.1,15.5,'#ada99a');
+    box(P.x,1.28,P.z,14.7,.32,14.7,'#e4d2ad');
+    box(P.x,1.53,P.z,13.9,.21,13.9,deepRed);
+    box(P.x,1.75,P.z,13.5,.25,13.5,'#b2775b');
+    for(let i=0;i<5;i++) {
+      const y=2.04+i*4.12, half=4.65-i*.51;
+      box(P.x,y+1.42,P.z,half*2,2.82,half*2,cream);
+      box(P.x,y+.12,P.z,half*2+.3,.29,half*2+.3,deepRed);
+      box(P.x,y+2.87,P.z,half*2+.35,.25,half*2+.35,deepRed);
+      for(let side of [-1,1]) for(let k of [-1,0,1]) {
+        box(P.x+k*half*.91,y+1.47,P.z+side*half,.24,2.85,.32,wood);
+        box(P.x+side*half,y+1.47,P.z+k*half*.91,.32,2.85,.24,wood);
+      }
+      for(let side of [-1,1]) {
+        box(P.x,y+1.53,P.z+side*half,half*2,.14,.18,wood);
+        box(P.x+side*half,y+1.53,P.z,.18,.14,half*2,wood);
+      }
+      if(i===0) {
+        box(P.x,y+1.25,P.z+half+.08,2.15,2.49,.25,deepRed);
+        box(P.x-.55,y+1.23,P.z+half+.24,.07,2.15,.09,gold);
+        box(P.x+.55,y+1.23,P.z+half+.24,.07,2.15,.09,gold);
+        box(P.x,y+2.38,P.z+half+.26,2.35,.12,.13,gold);
+        box(P.x,y+1.75,P.z+half+.28,.13,1.25,.12,gold);
+        for(let s of [-1,1]) box(P.x+s*2.7,y+1.75,P.z+half+.22,1.0,1.32,.13,'#354e53');
+      } else {
+        for(let s of [-1,1]) {
+          box(P.x+s*half*.49,y+1.78,P.z+half+.09,1.05,1.18,.17,'#354e53');
+          box(P.x+s*half*.49,y+1.78,P.z-half-.09,1.05,1.18,.17,'#354e53');
+          box(P.x+half+.09,y+1.78,P.z+s*half*.49,.17,1.18,1.05,'#354e53');
+          box(P.x-half-.09,y+1.78,P.z+s*half*.49,.17,1.18,1.05,'#354e53');
+        }
+      }
+      const ry=y+3.06, radius=half+1.66;
+      box(P.x,ry-.18,P.z,radius*2+.7,.31,radius*2+.7,deepRed);
+      box(P.x,ry+.03,P.z,radius*2+.15,.18,radius*2+.15,gold);
+      for(let gx=-radius;gx<=radius+.01;gx+=.69) for(let gz=-radius;gz<=radius+.01;gz+=.69) {
+        const edge=Math.max(Math.abs(gx),Math.abs(gz))/radius;
+        const tier=Math.floor((1-edge)*4.2);
+        const corner=(Math.abs(gx)>radius-.74 && Math.abs(gz)>radius-.74) ? .37 : 0;
+        box(P.x+gx,ry+.20+tier*.27+corner,P.z+gz,.68,.26,.68,pick(roof));
+      }
+      for(let s of [-1,1]) for(let t of [-1,1]) {
+        box(P.x+s*(radius+.14),ry+.6,P.z+t*(radius+.14),.82,.3,.82,deepRed);
+        box(P.x+s*(radius+.2),ry+.86,P.z+t*(radius+.2),.43,.32,.43,gold);
+      }
+      box(P.x,ry+1.45,P.z,.21,.35,radius*1.65,gold);
+      box(P.x,ry+1.45,P.z,radius*1.65,.35,.21,gold);
+    }
+    const top=2.04+4*4.12+3.06+2.1;
+    box(P.x,top+1.17,P.z,.66,2.55,.66,deepRed);
+    for(let i=0;i<5;i++) {
+      box(P.x,top+i*.57,P.z,2.08-i*.23,.17,2.08-i*.23,gold);
+      box(P.x,top+i*.57+.18,P.z,.48,.29,.48,'#e7c987');
+    }
+    box(P.x,top+3.16,P.z,.46,.82,.46,gold);
+    box(P.x,top+3.73,P.z,.8,.31,.8,'#fae2a2');
+
+    // Vermilion entrance gate.
+    for(let x of [-8.15,-1.85]) {
+      box(x,2.6,13.9,.58,5.18,.58,red);
+      box(x,5.18,13.9,.8,.33,.8,gold);
+      box(x,.22,13.9,1.1,.45,1.1,'#b4aa95');
+    }
+    box(-5,5.18,13.9,8.15,.59,.84,red);
+    box(-5,5.69,13.9,9.3,.24,1.04,'#593c3c');
+    box(-5,5.91,13.9,8.7,.2,.83,gold);
+    box(-5,4.48,13.9,6.5,.3,.42,deepRed);
+    box(-5,4.13,13.9,1.5,.63,.19,'#d6b26e');
+
+    // Arched bridge over the pond, its red rails following the deck.
+    for(let i=0;i<=23;i++) {
+      const x=.9+i*.79, u=(x-10)/9.2, h=.55+1.55*Math.max(0,1-u*u);
+      box(x,h,9,.75,.27,4.25,pick(['#b98261','#c6936d','#ac7157','#d0a27b']));
+      for(let s of [-1,1]) {
+        const z=9+s*2.2;
+        if(i%3===0) box(x,h+1.08,z,.16,1.86,.16,red);
+        box(x,h+1.89,z,.82,.18,.18,red);
+        box(x,h+1.1,z,.82,.12,.13,gold);
+      }
+    }
+    for(let x of [1,19]) for(let z of [6.7,11.3]) box(x,.26,z,1.4,.45,1.4,pick(stoneColors));
+
+    function branch(a,b,r,col) {
+      const dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2], length=Math.hypot(dx,dy,dz);
+      const count=Math.ceil(length/.43);
+      for(let j=0;j<=count;j++) {
+        const t=j/count;
+        box(a[0]+dx*t,a[1]+dy*t,a[2]+dz*t,r*(1-t*.45),r*(1-t*.45),r*(1-t*.45),col);
+      }
+    }
+    function canopy(cx,cy,cz,rx,ry,rz,colors,density=.70) {
+      for(let x=-rx;x<=rx;x+=.72) for(let y=-ry;y<=ry;y+=.72) for(let z=-rz;z<=rz;z+=.72) {
+        const d=(x/rx)**2+(y/ry)**2+(z/rz)**2;
+        if(d<1.0 && rand()<density*(d<.66?1:.71)) {
+          const s=between(.6,.91);
+          box(cx+x+between(-.13,.13),cy+y+between(-.12,.12),cz+z+between(-.13,.13),s,s,s,pick(colors));
+        }
+      }
+    }
+    function tree(x,z,type,scale=1) {
+      const cherry=type==='cherry', pine=type==='pine', autumn=type==='autumn';
+      const height=(cherry?7.2:pine?9:7.3)*scale;
+      const trunk=cherry?'#7a5555':'#665342';
+      branch([x,.3,z],[x,height*.77,z],.84*scale,trunk);
+      if(pine) {
+        for(let j=0;j<4;j++) canopy(x,height*(.48+j*.13),z,(4.4-j*.71)*scale,1.14*scale,(4.1-j*.7)*scale,['#3c7061','#517e61','#668966','#376657','#759773'],.65);
+        box(x,height+.8,z,.5,1,.5,'#527961');
+      } else {
+        const colors=cherry?pinks:autumn?['#d48356','#dba369','#e6b779','#bd6b57','#efc38a']:foliage;
+        for(let j=0;j<7;j++) {
+          const a=j*2.399+rand()*.3, reach=(j%2?3.2:2.6)*scale;
+          const tx=x+Math.cos(a)*reach, tz=z+Math.sin(a)*reach;
+          const ty=height*(.72+rand()*.2);
+          branch([x,height*.54,z],[tx,ty,tz],.46*scale,trunk);
+          canopy(tx,ty,tz,(cherry?2.35:2.05)*scale,1.55*scale,(cherry?2.25:2.05)*scale,colors,.58);
+        }
+        canopy(x,height*.96,z,2.3*scale,1.6*scale,2.25*scale,colors,.59);
+        if(cherry) for(let k=0;k<43;k++) {
+          const a=rand()*Math.PI*2, r=rand()*5.5*scale;
+          box(x+Math.cos(a)*r,.15,z+Math.sin(a)*r,.22,.07,.2,pick(pinks));
+        }
+      }
+      box(x,.13,z,2.2,.2,2.2,'#769568');
+    }
+    tree(-18,8,'cherry',1.22);
+    tree(18,-8,'cherry',1.18);
+    tree(21,15,'cherry',.79);
+    tree(-18,-13,'autumn',1.05);
+    tree(-3,-19,'pine',.92);
+    tree(14,-18,'pine',.96);
+    tree(-22,-2,'cherry',.78);
+    tree(23,0,'green',.9);
+
+    // Stone lanterns, each assembled as a miniature tower.
+    function lantern(x,z,scale=1) {
+      const b=(xx,yy,zz,w,h,d,c)=>box(x+xx*scale,yy*scale,z+zz*scale,w*scale,h*scale,d*scale,c);
+      b(0,.26,0,1.23,.48,1.23,'#aaa699');
+      b(0,1.13,0,.48,1.35,.48,'#c2baaa');
+      b(0,1.93,0,1.18,.23,1.18,'#aba99b');
+      b(0,2.43,0,1.03,.72,1.03,'#cfb694');
+      for(let s of [-1,1]) { b(s*.43,2.43,0,.17,.67,.17,'#847b70'); b(0,2.43,s*.43,.17,.67,.17,'#847b70'); }
+      b(0,2.42,.51,.55,.44,.06,'#ffd58f');
+      b(0,2.92,0,1.5,.18,1.5,'#777f79');
+      b(0,3.13,0,1.08,.25,1.08,'#8c968d');
+      b(0,3.37,0,.45,.29,.45,'#b2ad9e');
+    }
+    [[-12,4],[2,3],[-11,17],[1,17],[20,4],[-13,-11],[7,-13]].forEach(([x,z],i)=>lantern(x,z,i>3?.77:1));
+
+    // Lotus flowers and leaves float on the pond.
+    for(let i=0;i<25;i++) {
+      const x=between(3,18),z=between(3,15);
+      if(((x-10)/10.8)**2+((z-9)/7.1)**2>.82 || (z>6.3 && z<11.6)) continue;
+      box(x,.16,z,1.1,.08,.88,pick(['#5b9b7c','#75aa88','#6da286']));
+      if(rand()<.58) {
+        box(x,.37,z,.35,.3,.35,'#f6d8dc');
+        for(let a=0;a<4;a++) box(x+Math.cos(a*Math.PI/2)*.32,.33,z+Math.sin(a*Math.PI/2)*.32,.31,.19,.31,pick(['#f0a3b5','#fff0e5','#f7c4ce']));
+        box(x,.58,z,.13,.12,.13,gold);
+      }
+    }
+
+    // Flower drifts, pebbles, long grasses and a few whimsical mushrooms.
+    for(let i=0;i<1100;i++) {
+      const x=between(-23,23),z=between(-22,22);
+      if((x/25)**2+(z/24)**2>.92) continue;
+      if(((x-10)/12.1)**2+((z-9)/8.4)**2<1) continue;
+      if(Math.abs(x-P.x)<8.1 && Math.abs(z-P.z)<8.1) continue;
+      if(pathPoints.some(p=>Math.hypot(x-p[0],z-p[1])<1.95)) continue;
+      if(Math.abs(x+5)<5 && Math.abs(z-13.9)<2.1) continue;
+      const q=rand();
+      if(q<.31) {
+        const h=between(.45,1.02);
+        box(x,.18+h/2,z,.10,h,.10,'#5d8d64');
+        box(x,.24+h,z,.35,.26,.35,pick(['#f7d3cb','#e992a7','#f5eee0','#f4bd86','#d88ca8','#fff0d9']));
+        box(x,.43+h,z,.12,.12,.12,pick(['#f5d48e','#e8b86c']));
+      } else if(q<.55) {
+        box(x,.24,z,.13,.48,.13,pick(['#65985f','#76a569','#88b377']));
+        box(x+.16,.18,z,.12,.34,.12,'#87a974');
+      } else if(q<.68) box(x,.12,z,between(.28,.65),between(.16,.4),between(.28,.65),pick(stoneColors));
+    }
+    for(let i=0;i<20;i++) {
+      const x=between(-22,22), z=between(-21,20);
+      if(((x-10)/12)**2+((z-9)/8)**2<1 || Math.abs(x+5)<8 && Math.abs(z+5)<8) continue;
+      box(x,.29,z,.14,.55,.14,'#ede4c9');
+      box(x,.62,z,.57,.24,.57,pick(['#c6685c','#d57969','#e7a06f']));
+      box(x,.76,z,.17,.08,.17,'#f1e0bc');
+    }
+    // A few suspended petals give the composition depth without an animation dependency.
+    for(let i=0;i<105;i++) {
+      const cx=pick([-18,18,21,-22]),cz=cx===-18?8:cx===18?-8:cx===21?15:-2;
+      const x=cx+between(-6,6), z=cz+between(-5,5), y=between(1.3,10.7);
+      box(x,y,z,.18,.1,.22,pick(pinks));
+    }
+
+    const geometry = new THREE.BoxGeometry(1,1,1);
+    const material = new THREE.MeshStandardMaterial({roughness:.86, metalness:0});
+    const mesh = new THREE.InstancedMesh(geometry,material,cubes.length);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    const dummy = new THREE.Object3D(), color = new THREE.Color();
+    for(let i=0;i<cubes.length;i++) {
+      const [x,y,z,w,h,d,c]=cubes[i];
+      dummy.position.set(x,y,z); dummy.scale.set(w,h,d); dummy.updateMatrix();
+      mesh.setMatrixAt(i,dummy.matrix); mesh.setColorAt(i,color.set(c));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceColor.needsUpdate = true;
+    scene.add(mesh);
+
+    function resize() {
+      const aspect=innerWidth/innerHeight, span=31;
+      camera.left=-span*aspect; camera.right=span*aspect;
+      camera.top=span; camera.bottom=-span;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+    }
+    addEventListener('resize',resize); resize();
+    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
+    animate();
+  </script>
+</body>
+</html>

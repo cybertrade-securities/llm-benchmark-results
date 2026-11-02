@@ -147,6 +147,15 @@ tbody th { font-weight: 500; }
 .pair .bar-row { margin: 2px 0; grid-template-columns: 44px 1fr 72px; }
 .pair .bar-track { height: 10px; }
 .effort-sum { margin: 14px 0 0; font-size: 13px; color: var(--ink-2); }
+.voxels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; }
+.voxel { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; min-width: 0; }
+.voxel-stage { position: relative; aspect-ratio: 16 / 10; background: var(--surface-2); }
+.voxel-stage img, .voxel-stage iframe { display: block; width: 100%; height: 100%; object-fit: cover; border: 0; }
+.voxel-run { position: absolute; right: 12px; bottom: 12px; cursor: pointer; }
+.voxel figcaption { padding: 14px 16px 16px; font-size: 13px; color: var(--ink-2); }
+.voxel figcaption strong { display: block; color: var(--ink); font-size: 14px; margin-bottom: 4px; }
+.voxel-meta { display: block; margin-top: 6px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.voxel-meta a { color: inherit; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
 .card-head { display: flex; align-items: center; gap: 8px; }
@@ -280,6 +289,24 @@ footer { margin-top: 56px; color: var(--ink-3); font-size: 13px; }
 </section>
 
 <section>
+  <h2>创意题：像素宝塔（不计分）</h2>
+  <p class="lead">同一段提示词：做一个有宝塔、花园、树木和樱花的像素艺术场景，色彩丰富、细节精致，输出单个 HTML 文件。模型可以在容器里用无头浏览器截图，自己看效果再修改。这题不计入任何分数，目前只有 GPT 系列参加。点击“运行页面”后才会加载，页面在沙箱中运行，并从公共 CDN 加载 three.js。</p>
+  <div class="voxels"><figure class="voxel"><div class="voxel-stage"><img src="voxel/sol61.jpg" alt="GPT 6.1 Sol 生成的像素宝塔花园截图" width="1280" height="800" loading="lazy"><button type="button" class="seg-btn voxel-run" data-src="voxel/sol61.html" data-title="GPT 6.1 Sol 生成的像素宝塔花园">运行页面</button></div><figcaption><strong>GPT 6.1 Sol</strong>细节最丰富：有昼夜切换、瀑布、游鱼和飘落的花瓣。<span class="voxel-meta">22 分钟 · 总 tokens 2.90M · 输出 44k · 62 次请求 · <a href="voxel/sol61.html" target="_blank" rel="noopener">新标签打开</a></span></figcaption></figure><figure class="voxel"><div class="voxel-stage"><img src="voxel/sol60.jpg" alt="GPT 6 Sol 生成的像素宝塔花园截图" width="1280" height="800" loading="lazy"><button type="button" class="seg-btn voxel-run" data-src="voxel/sol60.html" data-title="GPT 6 Sol 生成的像素宝塔花园">运行页面</button></div><figcaption><strong>GPT 6 Sol</strong>五层宝塔、鸟居、拱桥与池塘，构图完整。<span class="voxel-meta">11 分钟 · 总 tokens 773k · 输出 22k · 28 次请求 · <a href="voxel/sol60.html" target="_blank" rel="noopener">新标签打开</a></span></figcaption></figure><figure class="voxel"><div class="voxel-stage"><img src="voxel/luna.jpg" alt="GPT 6 Luna 生成的像素宝塔花园截图" width="1280" height="800" loading="lazy"><button type="button" class="seg-btn voxel-run" data-src="voxel/luna.html" data-title="GPT 6 Luna 生成的像素宝塔花园">运行页面</button></div><figcaption><strong>GPT 6 Luna</strong>画面偏暗，宝塔上层缺少墙体，屋顶碎块悬在半空。<span class="voxel-meta">5 分钟 · 总 tokens 476k · 输出 12k · 21 次请求 · <a href="voxel/luna.html" target="_blank" rel="noopener">新标签打开</a></span></figcaption></figure><figure class="voxel"><div class="voxel-stage"><img src="voxel/luna56.jpg" alt="GPT 5.6 Luna 生成的像素宝塔花园截图" width="1280" height="800" loading="lazy"><button type="button" class="seg-btn voxel-run" data-src="voxel/luna56.html" data-title="GPT 5.6 Luna 生成的像素宝塔花园">运行页面</button></div><figcaption><strong>GPT 5.6 Luna</strong>结构完整但比较简单，页面文字也被去掉了。<span class="voxel-meta">5 分钟 · 总 tokens 718k · 输出 18k · 30 次请求 · <a href="voxel/luna56.html" target="_blank" rel="noopener">新标签打开</a></span></figcaption></figure></div>
+  <script>
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest(".voxel-run");
+    if (!button) return;
+    const frame = document.createElement("iframe");
+    frame.src = button.dataset.src;
+    frame.title = button.dataset.title;
+    frame.setAttribute("sandbox", "allow-scripts");
+    button.closest(".voxel").style.gridColumn = "1 / -1";
+    button.parentElement.replaceChildren(frame);
+  });
+  </script>
+</section>
+
+<section>
   <h2>评测方法与局限</h2>
   <ul class="method">
     <li>所有运行使用同一个 agent 框架（Codex CLI），每题都是新会话、新容器、新导出的代码副本，不共享其它题目的上下文。</li>
@@ -294,7 +321,8 @@ footer { margin-top: 56px; color: var(--ink-3); font-size: 13px; }
     <li>Qwen3.8 Flash Next 通过本地 Strata 配置提供服务，服务端把请求的 high 档改写为 xhigh，页面上统一标注为 xhigh。</li>
     <li>输入缓存命中率主要取决于服务端的提示缓存实现，本地服务普遍更高，不代表模型能力。</li>
     <li>GLM-5.3-Flash 的本地服务（Maya 配置）偶尔把工具调用以文本形式输出，评测前在适配层加了兜底转换，未改变模型的输出内容。</li>
-    <li>DeepSeek V4.1 Flash XS v2 通过 Maya 配置提供服务。T01 在调整配置前运行（262K 上下文，发生过一次上下文压缩），其余题目使用 524K 上下文和精简请求格式。T11–T13 首次运行时链上数据工具的连接认证已失效，没有取得任何链上数据，恢复连接后重跑并以重跑结果计分。它的工具调用偶尔出现格式错误（如调用未声明的工具），服务端随即中断流，由 agent 框架重连。DEX 接入两题还在运行，完成后更新。</li>
+    <li>DeepSeek V4.1 Flash XS v2 通过 Maya 配置提供服务。T01 在调整配置前运行（262K 上下文，发生过一次上下文压缩），其余题目使用 524K 上下文和精简请求格式。T11–T13 首次运行时链上数据工具的连接认证已失效，没有取得任何链上数据，恢复连接后重跑并以重跑结果计分。它的工具调用偶尔出现格式错误（如调用未声明的工具），服务端随即中断流，由 agent 框架重连。DEX 接入两题未计分：T14 两次运行都因模型服务中断而未完成（一次是上述格式错误，一次是连接中断），T15 在完成前停止，所以它只参与核心 100 分的比较。</li>
+    <li>像素宝塔创意题使用同一隔离容器，额外提供无头浏览器和一份本地 three.js；浏览器是软件渲染，模型可用它截图查看。提示词在原文后补充了这些环境说明。截图是评估者在模型完成后另外拍摄的，一句话描述是评估者的观察。</li>
   </ul>
 </section>
 
